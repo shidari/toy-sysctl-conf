@@ -1,6 +1,6 @@
-# mini-sysctl
+# toy-sysctl-conf
 
-sysctl.conf 形式の設定ファイルをパースし、スキーマに基づいて検証するライブラリ。
+sysctl.conf 形式の設定ファイルをパースし、スキーマに基づいて検証する toy ライブラリ。
 
 ## 設定ファイルの形式
 
@@ -41,7 +41,7 @@ retry = integer
 ## 使い方
 
 ```rust
-use mini_sysctl::{Config, Schema, validate};
+use toy_sysctl_conf::{Config, Schema, validate};
 
 // 設定ファイルをパース
 let config = Config::parse("endpoint = localhost:3000\nretry = 3").unwrap();
