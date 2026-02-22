@@ -136,24 +136,26 @@ pub struct Schema {
 
 impl Schema {
     pub fn parse(content: &str) -> Result<Self, ParseError> {
-        let tokens = tokenize(content)?;
-        let mut entries = HashMap::new();
-        for (i, token) in tokens.into_iter().enumerate() {
-            if let Token::KeyValue { key, value, .. } = token {
+        let entries = tokenize(content)?
+            .into_iter()
+            .enumerate()
+            .filter_map(|(i, token)| match token {
+                Token::KeyValue { key, value, .. } => Some((i, key, value)),
+                _ => None,
+            })
+            .map(|(i, key, value)| {
                 let vt = match value.as_str() {
                     "string" => ValueType::Str,
                     "bool" => ValueType::Bool,
                     "integer" => ValueType::Integer,
-                    other => {
-                        return Err(ParseError::InvalidType {
-                            line_number: i + 1,
-                            type_name: other.to_string(),
-                        })
-                    }
+                    other => return Err(ParseError::InvalidType {
+                        line_number: i + 1,
+                        type_name: other.to_string(),
+                    }),
                 };
-                entries.insert(key, vt);
-            }
-        }
+                Ok((key, vt))
+            })
+            .collect::<Result<HashMap<_, _>, _>>()?;
         Ok(Schema { entries })
     }
 }
