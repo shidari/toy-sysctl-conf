@@ -37,51 +37,42 @@ enum Token {
     },
 }
 
-#[derive(Debug)]
-struct Tokens {
-    tokens: Vec<Token>,
-}
-
-impl Tokens {
-    fn parse(content: &str) -> Result<Self, ParseError> {
-        let nodes = content
-            .lines()
-            .enumerate()
-            .map(|(i, line)| {
-                let trimmed = line.trim();
-                if trimmed.is_empty() {
-                    Ok(Token::BlankLine)
-                } else if trimmed.starts_with('#') || trimmed.starts_with(';') {
-                    Ok(Token::Comment(trimmed.to_string()))
-                } else if let Some(rest) = trimmed.strip_prefix('-') {
-                    let (key, value) = rest.split_once('=').ok_or(ParseError::InvalidLine {
-                        line_number: i + 1,
-                        content: line.to_string(),
-                    })?;
-                    Ok(Token::KeyValue {
-                        key: key.trim().to_string(),
-                        value: value.trim().to_string(),
-                        ignore_error: true,
-                    })
-                } else {
-                    let (key, value) =
-                        trimmed
-                            .split_once('=')
-                            .ok_or(ParseError::InvalidLine {
-                                line_number: i + 1,
-                                content: line.to_string(),
-                            })?;
-                    Ok(Token::KeyValue {
-                        key: key.trim().to_string(),
-                        value: value.trim().to_string(),
-                        ignore_error: false,
-                    })
-                }
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        Ok(Tokens { tokens: nodes })
-    }
+fn tokenize(content: &str) -> Result<Vec<Token>, ParseError> {
+    content
+        .lines()
+        .enumerate()
+        .map(|(i, line)| {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                Ok(Token::BlankLine)
+            } else if trimmed.starts_with('#') || trimmed.starts_with(';') {
+                Ok(Token::Comment(trimmed.to_string()))
+            } else if let Some(rest) = trimmed.strip_prefix('-') {
+                let (key, value) = rest.split_once('=').ok_or(ParseError::InvalidLine {
+                    line_number: i + 1,
+                    content: line.to_string(),
+                })?;
+                Ok(Token::KeyValue {
+                    key: key.trim().to_string(),
+                    value: value.trim().to_string(),
+                    ignore_error: true,
+                })
+            } else {
+                let (key, value) =
+                    trimmed
+                        .split_once('=')
+                        .ok_or(ParseError::InvalidLine {
+                            line_number: i + 1,
+                            content: line.to_string(),
+                        })?;
+                Ok(Token::KeyValue {
+                    key: key.trim().to_string(),
+                    value: value.trim().to_string(),
+                    ignore_error: false,
+                })
+            }
+        })
+        .collect()
 }
 
 // === Config ===
@@ -93,10 +84,9 @@ pub struct Config {
 
 impl Config {
     pub fn parse(content: &str) -> Result<Self, ParseError> {
-        let entries = Tokens::parse(content)?
-            .tokens
+        let entries = tokenize(content)?
             .into_iter()
-            .filter_map(|node| match node {
+            .filter_map(|token| match token {
                 Token::KeyValue { key, value, .. } => Some((key, value)),
                 _ => None,
             })
@@ -146,9 +136,9 @@ pub struct Schema {
 
 impl Schema {
     pub fn parse(content: &str) -> Result<Self, ParseError> {
-        let parsed = Tokens::parse(content)?;
+        let tokens = tokenize(content)?;
         let mut entries = HashMap::new();
-        for (i, token) in parsed.tokens.into_iter().enumerate() {
+        for (i, token) in tokens.into_iter().enumerate() {
             if let Token::KeyValue { key, value, .. } = token {
                 let vt = match value.as_str() {
                     "string" => ValueType::Str,
