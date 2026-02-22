@@ -24,10 +24,10 @@ impl fmt::Display for ParseError {
 
 impl std::error::Error for ParseError {}
 
-// === AST ===
+// === Token ===
 
 #[derive(Debug)]
-enum Node {
+enum Token {
     Comment(String),
     BlankLine,
     KeyValue {
@@ -38,11 +38,11 @@ enum Node {
 }
 
 #[derive(Debug)]
-struct AST {
-    nodes: Vec<Node>,
+struct Tokens {
+    tokens: Vec<Token>,
 }
 
-impl AST {
+impl Tokens {
     fn parse(content: &str) -> Result<Self, ParseError> {
         let nodes = content
             .lines()
@@ -50,15 +50,15 @@ impl AST {
             .map(|(i, line)| {
                 let trimmed = line.trim();
                 if trimmed.is_empty() {
-                    Ok(Node::BlankLine)
+                    Ok(Token::BlankLine)
                 } else if trimmed.starts_with('#') || trimmed.starts_with(';') {
-                    Ok(Node::Comment(trimmed.to_string()))
+                    Ok(Token::Comment(trimmed.to_string()))
                 } else if let Some(rest) = trimmed.strip_prefix('-') {
                     let (key, value) = rest.split_once('=').ok_or(ParseError::InvalidLine {
                         line_number: i + 1,
                         content: line.to_string(),
                     })?;
-                    Ok(Node::KeyValue {
+                    Ok(Token::KeyValue {
                         key: key.trim().to_string(),
                         value: value.trim().to_string(),
                         ignore_error: true,
@@ -71,7 +71,7 @@ impl AST {
                                 line_number: i + 1,
                                 content: line.to_string(),
                             })?;
-                    Ok(Node::KeyValue {
+                    Ok(Token::KeyValue {
                         key: key.trim().to_string(),
                         value: value.trim().to_string(),
                         ignore_error: false,
@@ -80,7 +80,7 @@ impl AST {
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        Ok(AST { nodes })
+        Ok(Tokens { tokens: nodes })
     }
 }
 
@@ -93,11 +93,11 @@ pub struct Config {
 
 impl Config {
     pub fn parse(content: &str) -> Result<Self, ParseError> {
-        let entries = AST::parse(content)?
-            .nodes
+        let entries = Tokens::parse(content)?
+            .tokens
             .into_iter()
             .filter_map(|node| match node {
-                Node::KeyValue { key, value, .. } => Some((key, value)),
+                Token::KeyValue { key, value, .. } => Some((key, value)),
                 _ => None,
             })
             .collect();
@@ -146,10 +146,10 @@ pub struct Schema {
 
 impl Schema {
     pub fn parse(content: &str) -> Result<Self, ParseError> {
-        let ast = AST::parse(content)?;
+        let parsed = Tokens::parse(content)?;
         let mut entries = HashMap::new();
-        for (i, node) in ast.nodes.into_iter().enumerate() {
-            if let Node::KeyValue { key, value, .. } = node {
+        for (i, token) in parsed.tokens.into_iter().enumerate() {
+            if let Token::KeyValue { key, value, .. } = token {
                 let vt = match value.as_str() {
                     "string" => ValueType::Str,
                     "bool" => ValueType::Bool,
